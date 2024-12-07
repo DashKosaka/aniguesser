@@ -1,0 +1,3 @@
+argh
+discord.py
+mal-api
