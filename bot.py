@@ -22,6 +22,7 @@ song_requirements = {
     "rank": None,
     "score": 7.5,
     "song_type": "opening",
+    # "duration": 15
 }
 
 state_manager = None
@@ -107,7 +108,7 @@ def run_bot(
         print("done")
 
 
-    async def play_song(ctx, url, duration=10):
+    async def play_song(ctx, url, duration=15):
         voice_channel = ctx.author.voice.channel
 
         try:
@@ -125,7 +126,7 @@ def run_bot(
             start_time = random.randint(0, max(0, video_duration - duration))
             
             FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-                       'options': '-vn'}
+                       'options':  f'-vn -ss {start_time} -t {duration}'}
 
             # TODO: Why is the sound going in and out?
             voice_client = discord.utils.get(bot.voice_clients, guild=ctx.guild)
