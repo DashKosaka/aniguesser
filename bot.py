@@ -1,12 +1,12 @@
+import asyncio
 import os
-import time
+import re
 import discord
-import json
 import random
-from discord.ext import commands
+import yt_dlp as youtube_dl
 from discord import FFmpegPCMAudio
-from argh import arg, dispatch_command
-from mal import Anime
+from discord.ext import commands
+from argh import dispatch_command
 from state_manager import StateManager
 from youtube_search import YoutubeSearch
 
@@ -15,105 +15,140 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+song_requirements = {
+    "members": 100000,
+    "popularity": None,
+    # "year": 1998,
+    "rank": None,
+    "score": 7.5,
+    "song_type": "opening",
+}
+
 state_manager = None
-
-def music_player(voice,author_channel):
-    global music_queue
-    while len(music_queue[author_channel]) != 0:
-        current_url = music_queue[author_channel].pop(0)
-        video, source = search(current_url)
-        FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-                       'options': '-vn'}
-        voice.play(FFmpegPCMAudio(source, **FFMPEG_OPTS), after=lambda e: print('done', e))
-        while voice.is_playing() == True:
-            time.sleep(1)
-
-def get_available(state, cache):
-    available_ids = set(list(range(1, highest_mal_id + 1)))
-
-    complete_ids = set(list(bot_state["complete"].keys()))
-    available_ids = available_ids - complete_ids
-
-    blacklist_ids = set(list(bot_state["blacklist"].keys()))
-    available_ids = available_ids - blacklist_ids
-    return list(all_ids - ignore_ids)
-
 
 def run_bot(
     state_path: "Path to load and save state" = "anicache.json",
 ):
     global state_manager
 
-    def aniguess():
+    @bot.command()
+    async def get_song_requirements(ctx):
+        global song_requirements
+        await ctx.send(song_requirements)
+
+    @bot.command()
+    async def set_song_requirements(ctx, members: int, popularity: int, rank: int, score: float):
+        global song_requirements
+        song_requirements["members"] = members
+        song_requirements["popularity"] = popularity
+        song_requirements["rank"] = rank
+        song_requirements["score"] = score
+        await ctx.send(song_requirements)
+
+    @bot.command()
+    async def aniguess(ctx):
         global state_manager
-        songs_ids = state_manager.search_songs(rank=100)
+        songs_ids = state_manager.search_songs(**song_requirements)
 
         mal_id, song_index = random.sample(songs_ids, 1)[0]
 
-        song = state_manager.query_song(mal_id, song_index)
+        song_query = state_manager.query_song(mal_id, song_index)
         anime = state_manager.query_anime(mal_id)
         # await ctx.send(f"Song: {song}")
         print(anime["title"])
         print(anime["rank"])
-        print(song)
 
-        # available_ids = get_available(bot_state, anicache)
-
-        top_result = YoutubeSearch(song, max_results=1).to_dict()
+        print(song_query)
+        song_query = song_query.replace("\"", "")
+        song_query = re.sub(r"(\(eps \d+.*?\))", "", song_query)
+        print(song_query)
+        top_result = YoutubeSearch(song_query, max_results=1).to_dict()
+        print(top_result)
         video_id = top_result[0]["id"]
 
+        embed = discord.Embed(
+            title="Guess the Anime!",
+            description="Listen to the clip and guess the anime",
+            color=discord.Color.blue()
+        )
+        
+        premiered = anime['premiered']
+        embed.add_field(
+            name="Hint 1: Premier Date", 
+            value=f"||{premiered}||", 
+            inline=False
+        )
+
+        song_name, singer = song_query.split("by")
+        embed.add_field(    
+            name="Hint 2: Song Name",
+            value=f"||{song_name.strip()}||",
+            inline=False
+        )
+
+        embed.add_field(    
+            name="Hint 3: Singer",
+            value=f"||{singer.strip()}||",
+            inline=False
+        )
+
+        title = anime['title']
+        embed.add_field(
+            name="Answer!", 
+            value=f"||{title}||", 
+            inline=False
+        )
+
+        await ctx.send(embed=embed)
+
         print(f"https://www.youtube.com/watch?v={video_id}")
+        await play_song(ctx, f"https://www.youtube.com/watch?v={video_id}")
 
-        # while True:
-        #     chosen_id = random.sample(available_ids)
+        print("done")
 
-    async def play_song(ctx, url):
-        # Check if user is in a voice channel
-        if not ctx.author.voice:
-            await ctx.send("You need to be in a voice channel to use this command!")
-            return
 
+    async def play_song(ctx, url, duration=10):
         voice_channel = ctx.author.voice.channel
 
-        # Connect to voice channel if not already connected
         try:
             voice_client = await voice_channel.connect()
         except discord.ClientException:
             voice_client = ctx.guild.voice_client
 
-        # Stop any currently playing audio
         if voice_client.is_playing():
             voice_client.stop()
 
-        # Create FFmpeg audio source from YouTube URL
-        FFMPEG_OPTIONS = {
-            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-            'options': '-vn'
-        }
-        YDL_OPTIONS = {'format': 'bestaudio'}
-
+        YDL_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': 'True'}
         with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
-            url2 = info['formats'][0]['url']
-            source = await discord.FFmpegOpusAudio.from_probe(url2, **FFMPEG_OPTIONS)
-            voice_client.play(source)
+            video_duration = info['duration']
+            start_time = random.randint(0, max(0, video_duration - duration))
+            
+            FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                       'options': '-vn'}
 
-    # Event: Bot is ready and running
-    # @bot.event
-    # async def on_ready():
-    #     print(f"Logged in as {bot.user}")
-    #     load_cache()
-    #     load_state()
+            # TODO: Why is the sound going in and out?
+            voice_client = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+            voice_client.play(FFmpegPCMAudio(info['url'], **FFMPEG_OPTS))
+
+            # Optional: Stop after duration
+            await asyncio.sleep(duration)
+            if voice_client.is_playing():
+                voice_client.stop()
+            await voice_client.disconnect()
+
+    @bot.event
+    async def on_ready():
+        print(f"Logged in as {bot.user}")
 
     bot_token = os.environ.get('ANIGUESSER_TOKEN')
     if bot_token is None:
         raise ValueError("ANIGUESSER_TOKEN not set!")
 
-    # bot.run(bot_token)
-
     state_manager = StateManager(state_path)
-    aniguess()
+    # aniguess()
 
+    bot.run(bot_token)
 
 def main():
     dispatch_command(run_bot)

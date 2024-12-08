@@ -70,12 +70,22 @@ def save_cache(
 
 def cache(
     state_path: "Path to cache anime information"="anicache.json",
-    wait_time: "Time to wait between requests"=4.0
+    wait_time: "Time to wait between requests"=4.0,
+    starting_mal_id: "Starting mal id to parse"=1,
+    ending_mal_id: "Highest mal id to parse"=60000,
+    redo_finished: "Reparse finished anime that was already parsed"=False,
+    redo_airing: "Reparse airing anime that was already parsed"=False,
 ):
+    ignore_status = []
+    if not redo_finished:
+        ignore_status.append("Finished Airing")
+    if not redo_airing:
+        ignore_status.append("Currently Airing")
+
     anicache = load_cache(state_path)
-    highest_mal_id = find_mal_entries()
-    parse_ids = list(range(1, highest_mal_id + 1))
-    ignore_ids = [int(mal_id) for mal_id in anicache["anime"] if anicache["anime"][mal_id]["status"] in ["Finished Airing"]]
+    # ending_mal = find_mal_entries()
+    parse_ids = list(range(starting_mal_id, ending_mal_id + 1))
+    ignore_ids = [int(mal_id) for mal_id in anicache["anime"] if anicache["anime"][mal_id]["status"] in ignore_status]
     parse_ids = list(set(parse_ids) - set(ignore_ids))
     nonexistent_ids = [int(mal_id) for mal_id in anicache["nonexistent"]]
     parse_ids = list(set(parse_ids) - set(nonexistent_ids))
@@ -97,6 +107,7 @@ def cache(
         entry = create_anime_entry(anime)
 
         print(mal_id, entry["title"])
+        print(entry["status"])
         anicache["anime"][mal_id] = entry
         if mal_id in anicache["errors"]:
             anicache["errors"].remove(mal_id)

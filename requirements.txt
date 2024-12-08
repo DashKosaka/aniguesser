@@ -1,3 +1,6 @@
 argh
 discord.py
 mal-api
+PyNaCl
+youtube-search
+yt-dlp
