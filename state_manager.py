@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 
 
 class StateManager:
@@ -19,7 +20,7 @@ class StateManager:
         # State should be loaded from file
         else:
             if os.path.exists(state_path):
-                self.state = self.load_state()
+                self.state = self.load_state(state_path)
             else:
                 self.state = self.get_default_state()
 
@@ -34,17 +35,33 @@ class StateManager:
             "nonexistent": []
         }
 
-    def load_state(self):
+    @staticmethod
+    def load_state(state_path):
         """Load the state from a file.
         """
-        with open(self.state_path, "r") as file:
+        with open(state_path, "r") as file:
             return json.load(file)
 
-    def save_state(self):
+    @staticmethod
+    def save_state(state, state_path):
         """Save the state to a file.
         """
-        with open(self.state_path, "w") as file:
-            json.dump(self.state, file, indent=4)
+        with open(state_path, "w") as file:
+            json.dump(state, file, indent=4)
+
+    @staticmethod
+    def merge_state(state_path_1, state_path_2):
+        """Merge the state with another state.
+        """
+        state_1 = StateManager.load_state(state_path_1)
+        state_2 = StateManager.load_state(state_path_2)
+
+        state_1["progress"].update(state_2["progress"])
+        state_1["anime"].update(state_2["anime"])
+        state_1["errors"] = list(set(state_1["errors"] + state_2["errors"]))
+        state_1["nonexistent"] = list(set(state_1["nonexistent"] + state_2["nonexistent"]))
+        
+        return state_1
 
     def search_songs(self, members=None, popularity=None, year=None, rank=None, score=None, song_type="opening"):
         """Search for songs in the state.
@@ -63,8 +80,16 @@ class StateManager:
                 if anime["popularity"] is None or anime["popularity"] > popularity:
                     continue
 
-            # if year is None or anime["aired"] < year:
-            #     continue
+            if year is not None:
+                parsed_years = []
+                if anime["aired"] is not None:
+                    parsed_years.extend(re.findall(r"\d{4}", anime["aired"]))
+                if anime["premiered"] is not None:
+                    parsed_years.extend(re.findall(r"\d{4}", anime["premiered"]))
+                
+                min_year = min(parsed_years) if len(parsed_years) > 0 else None
+                if min_year is None or min_year < year:
+                    continue
 
             if rank is not None:
                 if anime["rank"] is None or anime["rank"] > rank:

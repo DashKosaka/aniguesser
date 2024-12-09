@@ -18,11 +18,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 song_requirements = {
     "members": 100000,
     "popularity": None,
-    # "year": 1998,
+    "year": 1995,
     "rank": None,
     "score": 7.5,
     "song_type": "opening",
-    # "duration": 15
+}
+
+aniguesser_options = {
+    "duration": 15
 }
 
 state_manager = None
@@ -38,17 +41,37 @@ def run_bot(
         await ctx.send(song_requirements)
 
     @bot.command()
-    async def set_song_requirements(ctx, members: int, popularity: int, rank: int, score: float):
+    async def set_song_requirements(ctx, members: int, popularity: int, year: int, rank: int, score: float, song_type: str):
         global song_requirements
         song_requirements["members"] = members
         song_requirements["popularity"] = popularity
+        song_requirements["year"] = year
         song_requirements["rank"] = rank
         song_requirements["score"] = score
+        song_requirements["song_type"] = song_type
         await ctx.send(song_requirements)
+
+    @bot.command()
+    async def get_aniguesser_options(ctx):
+        global aniguesser_options
+        await ctx.send(aniguesser_options)
+
+    @bot.command()
+    async def set_aniguesser_options(ctx, duration: int):
+        global aniguesser_options
+        aniguesser_options["duration"] = duration
+        await ctx.send(aniguesser_options)
+
+    @bot.command()
+    async def merge_state(ctx, state_path_1: "Path to merge anime information"="anicache.json", state_path_2: "Path to merge anime information"="anicache_merged.json"):
+        global state_manager
+        state_manager.merge_state(state_path_1, state_path_2)
+        await ctx.send("State merged")
 
     @bot.command()
     async def aniguess(ctx):
         global state_manager
+        global aniguesser_options
         songs_ids = state_manager.search_songs(**song_requirements)
 
         mal_id, song_index = random.sample(songs_ids, 1)[0]
@@ -102,11 +125,9 @@ def run_bot(
 
         await ctx.send(embed=embed)
 
-        print(f"https://www.youtube.com/watch?v={video_id}")
-        await play_song(ctx, f"https://www.youtube.com/watch?v={video_id}")
-
-        print("done")
-
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        print(video_url)
+        await play_song(ctx, video_url, **aniguesser_options)
 
     async def play_song(ctx, url, duration=15):
         voice_channel = ctx.author.voice.channel
@@ -144,10 +165,9 @@ def run_bot(
 
     bot_token = os.environ.get('ANIGUESSER_TOKEN')
     if bot_token is None:
-        raise ValueError("ANIGUESSER_TOKEN not set!")
+        raise ValueError("Environment variable ANIGUESSER_TOKEN not set!")
 
     state_manager = StateManager(state_path)
-    # aniguess()
 
     bot.run(bot_token)
 
