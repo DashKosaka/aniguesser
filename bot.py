@@ -63,12 +63,6 @@ def run_bot(
         await ctx.send(aniguesser_options)
 
     @bot.command()
-    async def merge_state(ctx, state_path_1: "Path to merge anime information"="anicache.json", state_path_2: "Path to merge anime information"="anicache_merged.json"):
-        global state_manager
-        state_manager.merge_state(state_path_1, state_path_2)
-        await ctx.send("State merged")
-
-    @bot.command()
     async def aniguess(ctx):
         global state_manager
         global aniguesser_options
@@ -129,7 +123,7 @@ def run_bot(
         print(video_url)
         await play_song(ctx, video_url, **aniguesser_options)
 
-    async def play_song(ctx, url, duration=15):
+    async def play_song(ctx, url, duration=15, max_filesize_mb=3):
         voice_channel = ctx.author.voice.channel
 
         try:
@@ -140,7 +134,7 @@ def run_bot(
         if voice_client.is_playing():
             voice_client.stop()
 
-        YDL_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': 'True'}
+        YDL_OPTIONS = {'format': f'bestaudio[filesize<{max_filesize_mb}M]/best', 'noplaylist': 'True'}
         with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
             video_duration = info['duration']

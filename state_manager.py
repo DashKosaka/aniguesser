@@ -83,9 +83,9 @@ class StateManager:
             if year is not None:
                 parsed_years = []
                 if anime["aired"] is not None:
-                    parsed_years.extend(re.findall(r"\d{4}", anime["aired"]))
+                    parsed_years.extend([int(year) for year in re.findall(r"\d{4}", anime["aired"])])
                 if anime["premiered"] is not None:
-                    parsed_years.extend(re.findall(r"\d{4}", anime["premiered"]))
+                    parsed_years.extend([int(year) for year in re.findall(r"\d{4}", anime["premiered"])])
                 
                 min_year = min(parsed_years) if len(parsed_years) > 0 else None
                 if min_year is None or min_year < year:
