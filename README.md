@@ -1,6 +1,11 @@
-# AniGuess Discord Bot
+# Aniguesser Discord Bot
 
 A Discord bot that plays anime openings and endings within a discord channel in real time, challenging users to guess the anime.
+
+<img src="assets/aniguess_start.png" alt="Starting Embed" width=300>
+
+
+<img src="assets/aniguess_end.png" alt="Ending Embed" width=300>
 
 ## Features
 
